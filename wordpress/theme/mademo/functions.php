@@ -203,7 +203,7 @@ add_action('send_headers', function (): void {
         return;
     }
 
+    header("Content-Security-Policy: frame-ancestors 'self' https://wordpress.com https://*.wordpress.com");
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: strict-origin-when-cross-origin');
-    header('X-Frame-Options: SAMEORIGIN');
 });
