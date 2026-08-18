@@ -33,12 +33,18 @@ jobs:
           SSH_USER: ${{ vars.SSH_USER || secrets.SSH_USER }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || secrets.DEPLOY_PATH }}
         run: |
+          missing=0
           for var in SSH_PRIVATE_KEY SSH_HOST SSH_USER DEPLOY_PATH; do
             if [ -z "${!var}" ]; then
               echo "Missing required secret or config: $var"
-              exit 1
+              missing=1
             fi
           done
+
+          if [ "$missing" -eq 1 ]; then
+            echo "Deployment secrets not configured; skipping deployment."
+            exit 0
+          fi
 
           if [[ "$DEPLOY_PATH" != /* ]]; then
             echo "DEPLOY_PATH must be an absolute filesystem path, got: $DEPLOY_PATH"
