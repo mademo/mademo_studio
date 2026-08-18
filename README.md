@@ -1,11 +1,11 @@
+# mademo_studio
 
-  # Portfolio artistique interactif
+## Portfolio artistique interactif
 
-  This is a code bundle for Portfolio artistique interactif. The original project is available at https://www.figma.com/design/penqtatHk7bqQ0Ojth8BFI/Portfolio-artistique-interactif.
+This is a code bundle for Portfolio artistique interactif. The original project is available at https://www.figma.com/design/penqtatHk7bqQ0Ojth8BFI/Portfolio-artistique-interactif.
 
-  ## Running the code
+## Running the code
 
-  Run `npm i` to install the dependencies.
+Run `npm i` to install the dependencies.
 
-  Run `npm run dev` to start the development server.
-  
+Run `npm run dev` to start the development server.
