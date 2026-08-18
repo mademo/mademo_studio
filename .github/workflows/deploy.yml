@@ -12,12 +12,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -26,25 +26,49 @@ jobs:
       - name: Build front-end for WordPress
         run: BUILD_TARGET=wordpress npm run build
 
+      - name: Validate deployment secrets
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ vars.SSH_HOST || secrets.SSH_HOST }}
+          SSH_USER: ${{ vars.SSH_USER || secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || secrets.DEPLOY_PATH }}
+        run: |
+          for var in SSH_PRIVATE_KEY SSH_HOST SSH_USER DEPLOY_PATH; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret or config: $var"
+              exit 1
+            fi
+          done
+
+          if [[ "$DEPLOY_PATH" != /* ]]; then
+            echo "DEPLOY_PATH must be an absolute filesystem path, got: $DEPLOY_PATH"
+            exit 1
+          fi
+
       - name: Prepare SSH key
         if: ${{ secrets.SSH_HOST != '' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_HOST: ${{ vars.SSH_HOST || secrets.SSH_HOST }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null
 
       - name: Deploy theme and plugin to WordPress
         if: ${{ secrets.SSH_HOST != '' }}
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          SSH_HOST: ${{ vars.SSH_HOST || secrets.SSH_HOST }}
+          SSH_USER: ${{ vars.SSH_USER || secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || secrets.DEPLOY_PATH }}
         run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" "mkdir -p '$DEPLOY_PATH/themes/mademo' '$DEPLOY_PATH/plugins/mademo-studio'"
+
           rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/.ssh/known_hosts" \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='dist/.vite' \
@@ -52,6 +76,7 @@ jobs:
             "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/themes/mademo/"
 
           rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/.ssh/known_hosts" \
             --exclude='.git' \
             --exclude='node_modules' \
             wordpress/plugin/mademo-studio/ \
