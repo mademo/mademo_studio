@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+/dist/
+/build/
+/.vite/
+
+# Environment files
+.env
+.env.*
+
+# OS / editor artifacts
+.DS_Store
+Thumbs.db
+.history/
+.vscode/
+*.log
+
+# Package manager lock files (keep if you want to track them)
+# Uncomment if you prefer not to commit them:
+# package-lock.json
+# pnpm-lock.yaml
