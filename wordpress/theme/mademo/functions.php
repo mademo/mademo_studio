@@ -8,6 +8,23 @@
 
 defined('ABSPATH') || exit;
 
+if (
+    !function_exists('add_action') ||
+    !function_exists('add_filter') ||
+    !function_exists('remove_action') ||
+    !function_exists('add_theme_support') ||
+    !function_exists('register_nav_menus') ||
+    !function_exists('__') ||
+    !function_exists('is_post_type_archive') ||
+    !function_exists('is_singular') ||
+    !function_exists('get_stylesheet_directory') ||
+    !function_exists('wp_mkdir_p') ||
+    !function_exists('current_user_can') ||
+    !function_exists('is_admin')
+) {
+    return;
+}
+
 // ─── Support thème ────────────────────────────────────────────────────────────
 
 add_action('after_setup_theme', function (): void {
@@ -19,11 +36,26 @@ add_action('after_setup_theme', function (): void {
     ]);
 });
 
+add_action('wp_enqueue_scripts', function (): void {
+    if (!function_exists('wp_enqueue_style') || !function_exists('get_stylesheet_uri')) {
+        return;
+    }
+
+    $css_path = get_stylesheet_directory() . '/style.css';
+    $version = file_exists($css_path) ? filemtime($css_path) : false;
+
+    wp_enqueue_style('mademo-theme-style', get_stylesheet_uri(), [], $version ?: null);
+});
+
 /**
  * Les projets sont la première section migrée vers des modèles WordPress.
  */
 function mademo_is_native_project_request(): bool
 {
+    if (!function_exists('is_post_type_archive') || !function_exists('is_singular')) {
+        return false;
+    }
+
     return is_post_type_archive('mademo_project') || is_singular('mademo_project');
 }
 
@@ -31,6 +63,10 @@ function mademo_is_native_project_request(): bool
 
 function mademo_acf_json_dir(): string
 {
+    if (!function_exists('get_stylesheet_directory') || !function_exists('wp_mkdir_p')) {
+        return '';
+    }
+
     $dir = get_stylesheet_directory() . '/acf-json';
 
     if (!is_dir($dir)) {
@@ -46,6 +82,10 @@ add_filter('acf/settings/save_json', function () {
 
 add_filter('acf/settings/load_json', function (array $paths): array {
     $dir = mademo_acf_json_dir();
+    if ($dir === '') {
+        return $paths;
+    }
+
     if (!in_array($dir, $paths, true)) {
         $paths[] = $dir;
     }
@@ -87,11 +127,21 @@ remove_action('wp_head', 'wp_shortlink_wp_head');
 
 // ─── Barre d'admin ────────────────────────────────────────────────────────────
 
-add_filter('show_admin_bar', fn(): bool => current_user_can('administrator'));
+add_filter('show_admin_bar', function (): bool {
+    if (!function_exists('current_user_can')) {
+        return false;
+    }
+
+    return current_user_can('administrator');
+});
 
 // ─── Désactiver commentaires et trackbacks sur les CPT ───────────────────────
 
 add_action('init', function (): void {
+    if (!function_exists('remove_post_type_support')) {
+        return;
+    }
+
     $types = ['mademo_project', 'mademo_fragment', 'mademo_text', 'mademo_research'];
     foreach ($types as $type) {
         remove_post_type_support($type, 'comments');
@@ -106,7 +156,7 @@ add_filter('xmlrpc_enabled', '__return_false');
 // ─── Headers de sécurité supplémentaires ─────────────────────────────────────
 
 add_action('send_headers', function (): void {
-    if (is_admin()) {
+    if (!function_exists('is_admin') || is_admin()) {
         return;
     }
 
