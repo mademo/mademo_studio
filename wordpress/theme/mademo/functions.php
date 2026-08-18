@@ -27,135 +27,17 @@ function mademo_is_native_project_request(): bool
     return is_post_type_archive('mademo_project') || is_singular('mademo_project');
 }
 
-// ─── Enqueue du bundle React ───────────────────────────────────────────────────
+// ─── Theme WordPress natif ───────────────────────────────────────────────────
+// Le site est désormais exploité comme un thème WordPress éditable depuis le
+// back-office. Les contenus ACF, pages, blocs et textes sont rendus nativement
+// et la SPA n’est plus utilisée comme fallback sur les pages de contenu.
+//
+// Si un jour une app React est réintroduite, elle devra être branchée sur des
+// routes explicitement dédiées, sans remplacer les pages WordPress classiques.
 
-add_action('wp_enqueue_scripts', 'mademo_enqueue_assets');
-
-function mademo_enqueue_assets(): void
-{
-    $theme_dir = get_template_directory();
-    $theme_uri = get_template_directory_uri();
-
-    if (mademo_is_native_project_request()) {
-        wp_enqueue_style(
-            'mademo-projects',
-            $theme_uri . '/assets/css/projects.css',
-            [],
-            wp_get_theme()->get('Version')
-        );
-        return;
-    }
-
-    $manifest = $theme_dir . '/dist/.vite/manifest.json';
-
-    if (!file_exists($manifest)) {
-        add_action('wp_head', function (): void {
-            echo "\n<!-- [Mademo] Bundle introuvable dans /dist/. Lancez : BUILD_TARGET=wordpress npm run build -->\n";
-        });
-        return;
-    }
-
-    // Lire le manifest — avec mise en cache objet si disponible
-    $cache_key = 'mademo_manifest_' . filemtime($manifest);
-    $data = wp_cache_get($cache_key, 'mademo');
-    if (false === $data) {
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-        $raw = file_get_contents($manifest);
-        $data = $raw ? json_decode($raw, true) : null;
-        if ($data) {
-            wp_cache_set($cache_key, $data, 'mademo', HOUR_IN_SECONDS);
-        }
-    }
-
-    if (!is_array($data)) {
-        return;
-    }
-
-    // Vite 5 indexe par le chemin d'entrée relatif depuis la racine du projet
-    $entry = $data['index.html'] ?? $data['src/main.tsx'] ?? null;
-    if (!$entry) {
-        return;
-    }
-
-    // CSS
-    foreach ($entry['css'] ?? [] as $css_file) {
-        wp_enqueue_style('mademo-app', $theme_uri . '/dist/' . $css_file, [], null);
-    }
-
-    // JS principal — pas de version (hash Vite dans le nom de fichier)
-    wp_enqueue_script('mademo-app', $theme_uri . '/dist/' . $entry['file'], [], null, true);
-
-    // Préchargement des chunks dynamiques via modulepreload
-    // Ne pas enqueue les chunks : Vite injecte les <link rel="modulepreload"> lui-même
-    // Les enqueuer en plus causerait un double-chargement des modules ES
-    add_action('wp_head', function () use ($theme_uri, $data, $entry): void {
-        foreach ($entry['imports'] ?? [] as $chunk_key) {
-            $chunk = $data[$chunk_key] ?? null;
-            if ($chunk && isset($chunk['file'])) {
-                printf(
-                    '<link rel="modulepreload" href="%s" crossorigin>' . "\n",
-                    esc_url($theme_uri . '/dist/' . $chunk['file'])
-                );
-            }
-        }
-    }, 2);
-
-    // type="module" + crossorigin requis pour les ES modules
-    add_filter('script_loader_tag', 'mademo_script_attributes', 10, 2);
-}
-
-function mademo_script_attributes(string $tag, string $handle): string
-{
-    if (!str_starts_with($handle, 'mademo-')) {
-        return $tag;
-    }
-    // Ajoute type="module" et crossorigin (requis pour modulepreload + CORS)
-    return str_replace('<script ', '<script type="module" crossorigin ', $tag);
-}
-
-// ─── Config exposée à React ───────────────────────────────────────────────────
-
-add_action('wp_head', 'mademo_inline_config', 1);
-
-function mademo_inline_config(): void
-{
-    $upload = wp_upload_dir();
-    $config = [
-        'apiBase' => esc_url_raw(rest_url('mademo/v1')),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'siteUrl' => esc_url_raw(get_site_url()),
-        'uploadsUrl' => esc_url_raw($upload['baseurl']),
-        'isLoggedIn' => is_user_logged_in(),
-        'themeUrl' => esc_url_raw(get_template_directory_uri()),
-    ];
-    // wp_json_encode échappe les slashes et les caractères spéciaux — sûr pour inline JS
-    echo '<script>window.MADEMO_CONFIG=' . wp_json_encode($config, JSON_UNESCAPED_SLASHES) . ';</script>' . "\n";
-}
-
-// ─── SPA fallback ─────────────────────────────────────────────────────────────
-
-add_filter('template_include', function (string $template): string {
-    // Laisser passer : admin, REST API, flux, robots, sitemaps, trackbacks
-    if (
-        is_admin()
-        || (defined('REST_REQUEST') && REST_REQUEST)
-        || is_feed()
-        || is_robots()
-        || is_trackback()
-        || (defined('DOING_CRON') && DOING_CRON)
-    ) {
-        return $template;
-    }
-
-    // L'archive et les fiches projets utilisent désormais les modèles PHP du
-    // thème. Sans cette exception, index.php de la SPA les écrase.
-    if (mademo_is_native_project_request()) {
-        return $template;
-    }
-
-    $spa = get_template_directory() . '/index.php';
-    return file_exists($spa) ? $spa : $template;
-});
+// ─── Pas de fallback SPA ─────────────────────────────────────────────────────
+// Les contenus WordPress doivent rester éditables et rendus nativement. Le
+// thème ne redirige plus vers la SPA pour les pages classiques.
 
 // ─── Nettoyage du <head> ──────────────────────────────────────────────────────
 
