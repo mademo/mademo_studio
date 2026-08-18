@@ -1,0 +1,55 @@
+name: Deploy WordPress theme and plugin
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build front-end for WordPress
+        run: BUILD_TARGET=wordpress npm run build
+
+      - name: Prepare SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy theme and plugin to WordPress
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist/.vite' \
+            wordpress/theme/mademo/ \
+            "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/themes/mademo/"
+
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            wordpress/plugin/mademo-studio/ \
+            "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/plugins/mademo-studio/"
