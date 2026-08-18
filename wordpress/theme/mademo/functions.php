@@ -27,6 +27,31 @@ function mademo_is_native_project_request(): bool
     return is_post_type_archive('mademo_project') || is_singular('mademo_project');
 }
 
+// ─── ACF JSON sync ───────────────────────────────────────────────────────────
+
+function mademo_acf_json_dir(): string
+{
+    $dir = get_stylesheet_directory() . '/acf-json';
+
+    if (!is_dir($dir)) {
+        wp_mkdir_p($dir);
+    }
+
+    return $dir;
+}
+
+add_filter('acf/settings/save_json', function () {
+    return mademo_acf_json_dir();
+});
+
+add_filter('acf/settings/load_json', function (array $paths): array {
+    $dir = mademo_acf_json_dir();
+    if (!in_array($dir, $paths, true)) {
+        $paths[] = $dir;
+    }
+    return $paths;
+});
+
 // ─── Theme WordPress natif ───────────────────────────────────────────────────
 // Le site est désormais exploité comme un thème WordPress éditable depuis le
 // back-office. Les contenus ACF, pages, blocs et textes sont rendus nativement
