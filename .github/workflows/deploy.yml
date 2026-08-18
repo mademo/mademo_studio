@@ -46,11 +46,15 @@ jobs:
           fi
 
       - name: Prepare SSH key
-        if: ${{ secrets.SSH_HOST != '' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ vars.SSH_HOST || secrets.SSH_HOST }}
         run: |
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_HOST:-}" ]; then
+            echo "SSH credentials not configured; skipping SSH setup"
+            exit 0
+          fi
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
@@ -59,12 +63,16 @@ jobs:
           ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null
 
       - name: Deploy theme and plugin to WordPress
-        if: ${{ secrets.SSH_HOST != '' }}
         env:
           SSH_HOST: ${{ vars.SSH_HOST || secrets.SSH_HOST }}
           SSH_USER: ${{ vars.SSH_USER || secrets.SSH_USER }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || secrets.DEPLOY_PATH }}
         run: |
+          if [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_USER:-}" ] || [ -z "${DEPLOY_PATH:-}" ]; then
+            echo "Deployment config missing; skipping deploy"
+            exit 0
+          fi
+
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" "mkdir -p '$DEPLOY_PATH/themes/mademo' '$DEPLOY_PATH/plugins/mademo-studio'"
 
           rsync -avz --delete \
