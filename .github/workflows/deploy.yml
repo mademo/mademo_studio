@@ -27,6 +27,7 @@ jobs:
         run: BUILD_TARGET=wordpress npm run build
 
       - name: Prepare SSH key
+        if: ${{ secrets.SSH_HOST != '' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -37,6 +38,7 @@ jobs:
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy theme and plugin to WordPress
+        if: ${{ secrets.SSH_HOST != '' }}
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
