@@ -26,7 +26,9 @@ get_template_part('template-parts/navigation');
                     <?php if (function_exists('the_title')) {
                         the_title('<h1 class="mademo-single-post__title">', '</h1>');
                     } ?>
-                    <p class="mademo-single-post__meta"><?php echo esc_html(get_the_date()); ?></p>
+                    <?php if (function_exists('esc_html') && function_exists('get_the_date')) { ?>
+                        <p class="mademo-single-post__meta"><?php echo esc_html(get_the_date()); ?></p>
+                    <?php } ?>
                 </header>
 
                 <div class="mademo-single-post__body">
